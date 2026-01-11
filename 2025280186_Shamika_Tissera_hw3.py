@@ -317,18 +317,48 @@ def train_grpo(
             # ====================================================================
             # TODO 5: Implement the GRPO training step
             # ====================================================================
-            # NOTE: I merged some lines for clarity within the 10-line limit as given in the instructions.
-            
-            gen = generate_completions(model, tokenizer, input_ids, attention_mask, max_new_tokens=max_new_tokens, num_samples=group_size)
-            gt = [a for a in answers for _ in range(group_size)]; rewards = compute_reward(gen["completions"], gt).to(device)
+            gen = generate_completions(
+                model,
+                tokenizer,
+                input_ids,
+                attention_mask,
+                max_new_tokens=max_new_tokens,
+                num_samples=group_size
+            )
+
+            gt = [a for a in answers for _ in range(group_size)]
+            rewards = compute_reward(gen["completions"], gt).to(device)
+
             advantages = compute_advantages_grpo(rewards, group_size=group_size)
-            output_ids = gen["output_ids"]; prompt_len = gen["prompt_length"]
-            gen_mask = torch.ones_like(output_ids[:, prompt_len:], dtype=attention_mask.dtype); gen_mask = gen_mask * ((output_ids[:, prompt_len:] == tokenizer.eos_token_id).cumsum(1) <= 1).to(gen_mask.dtype)
+
+            output_ids = gen["output_ids"]
+            prompt_len = gen["prompt_length"]
+
+            gen_mask = torch.ones_like(output_ids[:, prompt_len:], dtype=attention_mask.dtype)
+            gen_mask = gen_mask * (
+                (output_ids[:, prompt_len:] == tokenizer.eos_token_id).cumsum(1) <= 1
+            ).to(gen_mask.dtype)
+
             attn = torch.cat([attention_mask.repeat_interleave(group_size, 0), gen_mask], 1)
-            loss_mask = attn.float(); loss_mask[:, :prompt_len] = 0
-            model.train(); logprobs = compute_logprobs_from_model(model, output_ids, attn)
-            loss = compute_policy_loss(logprobs, logprobs.detach(), advantages, loss_mask, clip_eps=clip_eps)
-            optimizer.zero_grad(); loss.backward(); optimizer.step()
+
+            loss_mask = attn.float()
+            loss_mask[:, :prompt_len] = 0
+
+            model.train()
+            logprobs = compute_logprobs_from_model(model, output_ids, attn)
+
+            loss = compute_policy_loss(
+                logprobs,
+                logprobs.detach(),
+                advantages,
+                loss_mask,
+                clip_eps=clip_eps
+            )
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
             
             # END TODO 5
             # ====================================================================
