@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+*.Identifier
+/20 epochs/saved_model
+/5 epochs/saved_model
+/50 epochs/saved_model
+/saved_model
+/report
